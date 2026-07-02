@@ -1,0 +1,27 @@
+# Files that should not ship in the release zip
+.distignore
+.editorconfig
+.git
+.gitignore
+.github
+.DS_Store
+Thumbs.db
+README.md
+package.json
+package-lock.json
+composer.json
+composer.lock
+phpunit.xml
+phpunit.xml.dist
+.phpcs.xml
+phpcs.xml
+.phpcs.xml.dist
+phpcs.xml.dist
+node_modules
+vendor
+tests
+bin
+dist
+*.sql
+*.tar.gz
+*.zip
