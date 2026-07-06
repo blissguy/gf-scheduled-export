@@ -115,11 +115,19 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 		);
 		$merge_tags[] = array(
 			'tag'   => '{period_start}',
-			'label' => esc_html__( 'Export Period Start Date', 'gf-scheduled-export' ),
+			'label' => esc_html__( 'Export Period Start (date and time)', 'gf-scheduled-export' ),
 		);
 		$merge_tags[] = array(
 			'tag'   => '{period_end}',
-			'label' => esc_html__( 'Export Period End Date', 'gf-scheduled-export' ),
+			'label' => esc_html__( 'Export Period End (date and time)', 'gf-scheduled-export' ),
+		);
+		$merge_tags[] = array(
+			'tag'   => '{period_start_date}',
+			'label' => esc_html__( 'Export Period Start (date only)', 'gf-scheduled-export' ),
+		);
+		$merge_tags[] = array(
+			'tag'   => '{period_end_date}',
+			'label' => esc_html__( 'Export Period End (date only)', 'gf-scheduled-export' ),
 		);
 
 		return $merge_tags;
@@ -868,13 +876,16 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 			return new WP_Error( 'gfse_no_recipients', __( 'The "Send To Email" address is missing or not valid.', 'gf-scheduled-export' ) );
 		}
 
-		$date_format = get_option( 'date_format', 'F j, Y' ) . ' ' . get_option( 'time_format', 'g:i a' );
+		$date_only   = get_option( 'date_format', 'F j, Y' );
+		$date_format = $date_only . ' ' . get_option( 'time_format', 'g:i a' );
 
 		$replacements = array(
-			'{form_title}'   => $form['title'],
-			'{entry_count}'  => (string) $export['count'],
-			'{period_start}' => wp_date( $date_format, $start->getTimestamp() ),
-			'{period_end}'   => wp_date( $date_format, $end->getTimestamp() ),
+			'{form_title}'        => $form['title'],
+			'{entry_count}'       => (string) $export['count'],
+			'{period_start}'      => wp_date( $date_format, $start->getTimestamp() ),
+			'{period_end}'        => wp_date( $date_format, $end->getTimestamp() ),
+			'{period_start_date}' => wp_date( $date_only, $start->getTimestamp() ),
+			'{period_end_date}'   => wp_date( $date_only, $end->getTimestamp() ),
 		);
 
 		$subject = strtr( $this->replace_merge_tags( rgars( $feed, 'meta/subject' ), $form ), $replacements );

@@ -4,7 +4,7 @@ Tags: gravity forms, export, email, csv, reports
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -63,6 +63,9 @@ By default nothing is sent, and the feed list notes that the last run had no new
 No. The spreadsheet is created in a temporary location, emailed, and deleted right away.
 
 == Changelog ==
+
+= 1.2.0 =
+* New: {period_start_date} and {period_end_date} merge tags that show just the date, without the time — handy for tidier subject lines.
 
 = 1.1.0 =
 * New: weekly and monthly exports can now send a short email on periods with no new entries, so recipients know the export is still running. Turn it on per export under "Quiet Periods", and optionally write your own no-entries message (leaving it blank uses a ready-made one).
