@@ -1,6 +1,6 @@
 {
   "name": "gf-scheduled-export",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Automatically emails you a spreadsheet of new form submissions on an hourly, weekly, or monthly schedule. Works with Gravity Forms.",
   "author": "Mixbus Marketing",
   "license": "GPL-2.0-or-later",

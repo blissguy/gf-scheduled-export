@@ -4,7 +4,7 @@ Tags: gravity forms, export, email, csv, reports
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,7 +26,7 @@ It's built on the official Gravity Forms add-on framework, so it feels right at 
 * Set up as many exports as you like, on any of your forms, each with its own schedule and recipients.
 * The feed list shows each export's schedule and when it last ran, right inside your form's settings.
 * A "Send Test" link on every export sends it immediately using its saved settings, so you can confirm everything works without waiting for the schedule.
-* Quiet periods with no new submissions are skipped — no empty emails.
+* Quiet periods with no new submissions are skipped by default — no empty emails. Weekly and monthly exports can instead send a short "still running" note, with a message you can customize.
 * The spreadsheets open cleanly in Excel and Google Sheets.
 
 **Good to know**
@@ -56,13 +56,17 @@ Everything received since the previous export went out. A brand-new export start
 
 = What happens if there were no new submissions? =
 
-Nothing is sent, and the feed list notes that the last run had no new entries. You won't get empty spreadsheets.
+By default nothing is sent, and the feed list notes that the last run had no new entries — you won't get empty spreadsheets. On weekly and monthly exports you can turn on "Send an email even when there are no new entries" to get a short note confirming the export is still running; you can write your own version of that note or leave it blank to use the ready-made one.
 
 = Is the exported data stored anywhere? =
 
 No. The spreadsheet is created in a temporary location, emailed, and deleted right away.
 
 == Changelog ==
+
+= 1.1.0 =
+* New: weekly and monthly exports can now send a short email on periods with no new entries, so recipients know the export is still running. Turn it on per export under "Quiet Periods", and optionally write your own no-entries message (leaving it blank uses a ready-made one).
+* New: the Message box now shows the ready-made email text it will use when left blank, so you can see exactly what recipients get before deciding to customize it.
 
 = 1.0.0 =
 * First release: scheduled entry exports built on the Gravity Forms add-on framework. Hourly, weekly, or monthly emails with a CSV spreadsheet of new submissions, per-form export feeds, merge tag support, conditional logic, a last-run status column, and a "Send Test" action to try any export immediately.

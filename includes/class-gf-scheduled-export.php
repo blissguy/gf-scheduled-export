@@ -299,10 +299,66 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 						'class'         => $merge_tag_class,
 					),
 					array(
-						'name'  => 'message',
-						'label' => esc_html__( 'Message', 'gf-scheduled-export' ),
-						'type'  => 'textarea',
-						'class' => $merge_tag_class . ' medium',
+						'name'        => 'message',
+						'label'       => esc_html__( 'Message', 'gf-scheduled-export' ),
+						'type'        => 'textarea',
+						'class'       => $merge_tag_class . ' medium',
+						'placeholder' => $this->get_default_message(),
+						'tooltip'     => sprintf(
+							'<h6>%s</h6>%s',
+							esc_html__( 'Message', 'gf-scheduled-export' ),
+							esc_html__( 'The body of the export email. Leave blank to use the ready-made message shown in the box.', 'gf-scheduled-export' )
+						),
+					),
+					array(
+						'name'       => 'send_empty_group',
+						'label'      => esc_html__( 'Quiet Periods', 'gf-scheduled-export' ),
+						'type'       => 'checkbox',
+						'tooltip'    => sprintf(
+							'<h6>%s</h6>%s',
+							esc_html__( 'Quiet Periods', 'gf-scheduled-export' ),
+							esc_html__( 'Normally nothing is sent when there are no new entries. Turn this on to send a short email anyway, so recipients know the export is still running.', 'gf-scheduled-export' )
+						),
+						'choices'    => array(
+							array(
+								'label' => esc_html__( 'Send an email even when there are no new entries', 'gf-scheduled-export' ),
+								'name'  => 'send_empty',
+							),
+						),
+						'dependency' => array(
+							'live'   => true,
+							'fields' => array(
+								array(
+									'field'  => 'frequency',
+									'values' => array( 'weekly', 'monthly' ),
+								),
+							),
+						),
+					),
+					array(
+						'name'        => 'empty_message',
+						'label'       => esc_html__( 'No-Entries Message', 'gf-scheduled-export' ),
+						'type'        => 'textarea',
+						'class'       => $merge_tag_class . ' medium',
+						'placeholder' => $this->get_default_empty_message(),
+						'tooltip'     => sprintf(
+							'<h6>%s</h6>%s',
+							esc_html__( 'No-Entries Message', 'gf-scheduled-export' ),
+							esc_html__( 'Sent instead of the message above when there are no new entries. Leave blank to use the ready-made message shown in the box.', 'gf-scheduled-export' )
+						),
+						'dependency'  => array(
+							'live'   => true,
+							'fields' => array(
+								array(
+									'field'  => 'frequency',
+									'values' => array( 'weekly', 'monthly' ),
+								),
+								array(
+									'field'  => 'send_empty_group',
+									'values' => array( '1' ),
+								),
+							),
+						),
 					),
 					array(
 						'name'           => 'feed_condition',
@@ -731,7 +787,7 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 			return $export;
 		}
 
-		if ( 0 === $export['count'] && ! $is_test ) {
+		if ( 0 === $export['count'] && ! $is_test && ! $this->should_send_when_empty( $feed ) ) {
 			// Nothing new; don't email an empty spreadsheet.
 			wp_delete_file( $export['file'] );
 			return 'skipped';
@@ -746,6 +802,38 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 		}
 
 		return 'sent';
+	}
+
+	/**
+	 * The quiet-period email only applies to weekly and monthly feeds; an
+	 * hourly feed would otherwise email an empty spreadsheet all day long.
+	 *
+	 * @param array $feed
+	 * @return bool
+	 */
+	private function should_send_when_empty( $feed ) {
+		return in_array( rgars( $feed, 'meta/frequency' ), array( 'weekly', 'monthly' ), true )
+			&& rgars( $feed, 'meta/send_empty' );
+	}
+
+	/**
+	 * Used both as the Message placeholder and as the fallback when that
+	 * setting is left blank.
+	 *
+	 * @return string
+	 */
+	private function get_default_message() {
+		return __( "Attached is a spreadsheet of the new {form_title} submissions received between {period_start} and {period_end}.\n\nTotal new submissions: {entry_count}", 'gf-scheduled-export' );
+	}
+
+	/**
+	 * Used both as the No-Entries Message placeholder and as the fallback
+	 * when that setting is left blank.
+	 *
+	 * @return string
+	 */
+	private function get_default_empty_message() {
+		return __( 'No new submissions were received between {period_start} and {period_end}. This email confirms your scheduled export is still running.', 'gf-scheduled-export' );
 	}
 
 	/**
@@ -790,7 +878,6 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 		);
 
 		$subject = strtr( $this->replace_merge_tags( rgars( $feed, 'meta/subject' ), $form ), $replacements );
-		$message = strtr( $this->replace_merge_tags( rgars( $feed, 'meta/message' ), $form ), $replacements );
 
 		if ( '' === trim( $subject ) ) {
 			$subject = __( 'Scheduled Export', 'gf-scheduled-export' );
@@ -804,22 +891,28 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 			);
 		}
 
-		$message .= ( '' === trim( $message ) ? '' : "\n\n" ) . sprintf(
-			/* translators: 1: form title, 2: number of entries, 3: period start, 4: period end */
-			_n(
-				'%1$s: %2$d new entry between %3$s and %4$s. The full export is attached as a spreadsheet.',
-				'%1$s: %2$d new entries between %3$s and %4$s. The full export is attached as a spreadsheet.',
-				$export['count'],
-				'gf-scheduled-export'
-			),
-			$form['title'],
-			$export['count'],
-			$replacements['{period_start}'],
-			$replacements['{period_end}']
-		);
+		if ( 0 === $export['count'] && ! $is_test ) {
+			// Quiet-period email: use the No-Entries Message, falling back
+			// to the ready-made text the setting shows as its placeholder.
+			$template = rgars( $feed, 'meta/empty_message' );
 
-		if ( $is_test ) {
-			$message .= "\n\n" . __( 'This is a test send. The real export will go out on its normal schedule and will only include entries received since the previous export.', 'gf-scheduled-export' );
+			if ( '' === trim( (string) $template ) ) {
+				$template = $this->get_default_empty_message();
+			}
+
+			$message = strtr( $this->replace_merge_tags( $template, $form ), $replacements );
+		} else {
+			$template = rgars( $feed, 'meta/message' );
+
+			if ( '' === trim( (string) $template ) ) {
+				$template = $this->get_default_message();
+			}
+
+			$message = strtr( $this->replace_merge_tags( $template, $form ), $replacements );
+
+			if ( $is_test ) {
+				$message .= "\n\n" . __( 'This is a test send. The real export will go out on its normal schedule and will only include entries received since the previous export.', 'gf-scheduled-export' );
+			}
 		}
 
 		$headers = array();
