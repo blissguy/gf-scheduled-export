@@ -1,0 +1,38 @@
+/* Date picker opened by a manual export's "Download" row action. */
+
+.gfse-download-dialog {
+	border: 0;
+	border-radius: 8px;
+	box-shadow: 0 12px 40px rgb(0 0 0 / 20%);
+	padding: 24px;
+	width: min(420px, calc(100vw - 32px));
+}
+
+.gfse-download-dialog::backdrop {
+	background: rgb(0 0 0 / 40%);
+}
+
+.gfse-download-dialog h2 {
+	margin-top: 0;
+}
+
+.gfse-download-dialog label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+
+.gfse-download-dialog input[type="date"] {
+	width: 100%;
+}
+
+.gfse-download-dialog .description {
+	display: block;
+	margin-top: 4px;
+}
+
+.gfse-download-dialog__actions {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 0;
+}

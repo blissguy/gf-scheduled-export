@@ -4,7 +4,7 @@ Tags: gravity forms, export, email, csv, reports
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,6 +26,7 @@ It's built on the official Gravity Forms add-on framework, so it feels right at 
 * Set up as many exports as you like, on any of your forms, each with its own schedule and recipients.
 * The feed list shows each export's schedule and when it last ran, right inside your form's settings.
 * A "Send Test" link on every export sends it immediately using its saved settings, so you can confirm everything works without waiting for the schedule.
+* Need a one-off spreadsheet instead? Set an export to "Manual download", then click "Download" in the list and pick the dates. Nothing is emailed.
 * Quiet periods with no new submissions are skipped by default — no empty emails. Weekly and monthly exports can instead send a short "still running" note, with a message you can customize.
 * The spreadsheets open cleanly in Excel and Google Sheets.
 
@@ -33,7 +34,7 @@ It's built on the official Gravity Forms add-on framework, so it feels right at 
 
 * Gravity Forms (the free version is fine) must be installed and active.
 * Exports send reliably when your website sends email reliably. If your site's emails sometimes land in spam, pair this with a free email delivery plugin such as FluentSMTP or WP Mail SMTP.
-* No submission data is ever left on your server — the spreadsheet is created, emailed, and immediately deleted.
+* No submission data is ever left on your server — the spreadsheet is created, emailed or downloaded, and immediately deleted.
 
 By Mixbus Marketing | https://mixbusmarketing.com/
 
@@ -58,11 +59,18 @@ Everything received since the previous export went out. A brand-new export start
 
 By default nothing is sent, and the feed list notes that the last run had no new entries — you won't get empty spreadsheets. On weekly and monthly exports you can turn on "Send an email even when there are no new entries" to get a short note confirming the export is still running; you can write your own version of that note or leave it blank to use the ready-made one.
 
+= Can I download a spreadsheet instead of having it emailed? =
+
+Yes. Add an export, set Frequency to "Manual download", and save. Its row in the list then has a "Download" link: pick a From and To date and the spreadsheet downloads straight to your browser. Leave From blank to start at the first entry, and To blank to include everything up to now. The To date includes that whole day. The export's conditional logic still applies, and downloading needs the Gravity Forms "Export Entries" permission. Manual exports never send email, and turning one off doesn't stop you downloading it.
+
 = Is the exported data stored anywhere? =
 
-No. The spreadsheet is created in a temporary location, emailed, and deleted right away.
+No. The spreadsheet is created in a temporary location, emailed or downloaded, and deleted right away.
 
 == Changelog ==
+
+= 1.3.0 =
+* New: "Manual download" frequency. Pick any From and To dates and download the spreadsheet from the export list, with nothing emailed.
 
 = 1.2.0 =
 * New: {period_start_date} and {period_end_date} merge tags that show just the date, without the time — handy for tidier subject lines.

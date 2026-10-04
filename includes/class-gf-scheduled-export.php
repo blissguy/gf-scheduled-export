@@ -42,8 +42,11 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 
 		add_action( GFSE_CRON_HOOK, array( $this, 'process_scheduled_feeds' ) );
 		add_action( 'admin_post_gfse_send_test', array( $this, 'handle_send_test' ) );
+		add_action( 'admin_post_gfse_download', array( $this, 'handle_download' ) );
 		add_action( 'admin_notices', array( $this, 'maybe_render_test_notice' ) );
+		add_action( 'admin_footer', array( $this, 'maybe_render_download_dialog' ) );
 		add_filter( 'gform_custom_merge_tags', array( $this, 'add_custom_merge_tags' ), 10, 4 );
+		add_filter( $this->_slug . '_feed_actions', array( $this, 'filter_feed_actions' ), 10, 3 );
 
 		// Self-heal if the cron event was lost (e.g. a cron cleanup plugin).
 		if ( ! wp_next_scheduled( GFSE_CRON_HOOK ) ) {
@@ -64,7 +67,8 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 
 	/**
 	 * Limit the merge tag drop-down on this add-on's feed settings tab to
-	 * tags that can resolve in a batch export (no single-entry tags).
+	 * tags that can resolve in a batch export (no single-entry tags), and
+	 * open the date picker from the "Download" row action.
 	 */
 	public function scripts() {
 		$scripts = array(
@@ -81,9 +85,39 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 					),
 				),
 			),
+			array(
+				'handle'    => 'gfse_download',
+				'src'       => plugins_url( 'js/download.js', GFSE_PLUGIN_FILE ),
+				'version'   => $this->_version,
+				'in_footer' => true,
+				'enqueue'   => array(
+					array(
+						'admin_page' => array( 'form_settings' ),
+						'tab'        => $this->_slug,
+					),
+				),
+			),
 		);
 
 		return array_merge( parent::scripts(), $scripts );
+	}
+
+	public function styles() {
+		$styles = array(
+			array(
+				'handle'  => 'gfse_download',
+				'src'     => plugins_url( 'css/download.css', GFSE_PLUGIN_FILE ),
+				'version' => $this->_version,
+				'enqueue' => array(
+					array(
+						'admin_page' => array( 'form_settings' ),
+						'tab'        => $this->_slug,
+					),
+				),
+			),
+		);
+
+		return array_merge( parent::styles(), $styles );
 	}
 
 	// ---------------------------------------------------------------------
@@ -140,9 +174,20 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 	public function feed_settings_fields() {
 		$merge_tag_class = 'merge-tag-support mt-position-right mt-hide_all_fields';
 
+		// Email settings don't apply to manual exports, which are only downloaded.
+		$scheduled_only = array(
+			'live'   => true,
+			'fields' => array(
+				array(
+					'field'  => 'frequency',
+					'values' => array( 'hourly', 'weekly', 'monthly' ),
+				),
+			),
+		);
+
 		return array(
 			array(
-				'description' => '<p>' . esc_html__( 'The settings below will automatically export new entries and send them to the emails below based on the set time frame.', 'gf-scheduled-export' ) . '</p>',
+				'description' => '<p>' . esc_html__( 'The settings below will automatically export new entries and send them to the emails below based on the set time frame. Choose Manual download instead to pick the dates and download the spreadsheet yourself.', 'gf-scheduled-export' ) . '</p>',
 				'fields'      => array(
 					array(
 						'name'     => 'feedName',
@@ -160,7 +205,7 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 						'tooltip'       => sprintf(
 							'<h6>%s</h6>%s',
 							esc_html__( 'Frequency', 'gf-scheduled-export' ),
-							esc_html__( 'How often the export email is sent. Hourly sends any new entries every hour. Weekly and Monthly send on the day and time you pick below.', 'gf-scheduled-export' )
+							esc_html__( 'How often the export email is sent. Hourly sends any new entries every hour. Weekly and Monthly send on the day and time you pick below. Manual download never sends an email: use Download in the export list and pick the dates each time.', 'gf-scheduled-export' )
 						),
 						'choices'       => array(
 							array(
@@ -174,6 +219,24 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 							array(
 								'label' => esc_html__( 'Monthly', 'gf-scheduled-export' ),
 								'value' => 'monthly',
+							),
+							array(
+								'label' => esc_html__( 'Manual download', 'gf-scheduled-export' ),
+								'value' => 'manual',
+							),
+						),
+					),
+					array(
+						'name'       => 'manual_download_note',
+						'type'       => 'html',
+						'html'       => '<p class="description">' . esc_html__( 'Save this export, then click Download under its name in the export list to pick the dates.', 'gf-scheduled-export' ) . '</p>',
+						'dependency' => array(
+							'live'   => true,
+							'fields' => array(
+								array(
+									'field'  => 'frequency',
+									'values' => array( 'manual' ),
+								),
 							),
 						),
 					),
@@ -252,17 +315,19 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 						'required'      => true,
 						'default_value' => '{admin_email}',
 						'class'         => $merge_tag_class,
+						'dependency'    => $scheduled_only,
 					),
 					array(
-						'name'    => 'from_name',
-						'label'   => esc_html__( 'From Name', 'gf-scheduled-export' ),
-						'type'    => 'text',
-						'class'   => $merge_tag_class,
-						'tooltip' => sprintf(
+						'name'       => 'from_name',
+						'label'      => esc_html__( 'From Name', 'gf-scheduled-export' ),
+						'type'       => 'text',
+						'class'      => $merge_tag_class,
+						'tooltip'    => sprintf(
 							'<h6>%s</h6>%s',
 							esc_html__( 'From Name', 'gf-scheduled-export' ),
 							esc_html__( 'The name the export email appears to come from. Leave blank to use the site default.', 'gf-scheduled-export' )
 						),
+						'dependency' => $scheduled_only,
 					),
 					array(
 						'name'          => 'from_email',
@@ -275,28 +340,31 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 							esc_html__( 'From Email', 'gf-scheduled-export' ),
 							esc_html__( 'The address the export email is sent from. Use an address that matches this website so the email is less likely to land in spam.', 'gf-scheduled-export' )
 						),
+						'dependency'    => $scheduled_only,
 					),
 					array(
-						'name'    => 'reply_to',
-						'label'   => esc_html__( 'Reply To', 'gf-scheduled-export' ),
-						'type'    => 'text',
-						'class'   => $merge_tag_class,
-						'tooltip' => sprintf(
+						'name'       => 'reply_to',
+						'label'      => esc_html__( 'Reply To', 'gf-scheduled-export' ),
+						'type'       => 'text',
+						'class'      => $merge_tag_class,
+						'tooltip'    => sprintf(
 							'<h6>%s</h6>%s',
 							esc_html__( 'Reply To', 'gf-scheduled-export' ),
 							esc_html__( 'Replies to the export email go to this address.', 'gf-scheduled-export' )
 						),
+						'dependency' => $scheduled_only,
 					),
 					array(
-						'name'    => 'bcc',
-						'label'   => esc_html__( 'BCC', 'gf-scheduled-export' ),
-						'type'    => 'text',
-						'class'   => $merge_tag_class,
-						'tooltip' => sprintf(
+						'name'       => 'bcc',
+						'label'      => esc_html__( 'BCC', 'gf-scheduled-export' ),
+						'type'       => 'text',
+						'class'      => $merge_tag_class,
+						'tooltip'    => sprintf(
 							'<h6>%s</h6>%s',
 							esc_html__( 'BCC', 'gf-scheduled-export' ),
 							esc_html__( 'Sends a hidden copy of the export email to these addresses.', 'gf-scheduled-export' )
 						),
+						'dependency' => $scheduled_only,
 					),
 					array(
 						'name'          => 'subject',
@@ -305,6 +373,7 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 						'required'      => true,
 						'default_value' => esc_html__( 'Scheduled Export', 'gf-scheduled-export' ),
 						'class'         => $merge_tag_class,
+						'dependency'    => $scheduled_only,
 					),
 					array(
 						'name'        => 'message',
@@ -317,6 +386,7 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 							esc_html__( 'Message', 'gf-scheduled-export' ),
 							esc_html__( 'The body of the export email. Leave blank to use the ready-made message shown in the box.', 'gf-scheduled-export' )
 						),
+						'dependency'  => $scheduled_only,
 					),
 					array(
 						'name'       => 'send_empty_group',
@@ -440,6 +510,44 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 	}
 
 	/**
+	 * Manual exports never send email, so their row offers "Download" in
+	 * place of "Send Test".
+	 *
+	 * @param array  $links  Row action links, keyed by action.
+	 * @param array  $feed   The feed in this row.
+	 * @param string $column The column the links are rendered in.
+	 * @return array
+	 */
+	public function filter_feed_actions( $links, $feed, $column ) {
+		if ( 'manual' !== rgars( $feed, 'meta/frequency' ) ) {
+			return $links;
+		}
+
+		unset( $links['send_test'] );
+
+		if ( ! GFCommon::current_user_can_any( 'gravityforms_export_entries' ) ) {
+			return $links;
+		}
+
+		// Without JavaScript the link still works and downloads every entry;
+		// js/download.js turns it into a date picker.
+		$download_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=gfse_download&feed_id=' . absint( rgar( $feed, 'id' ) ) ),
+			'gfse_download'
+		);
+
+		$links['download'] = sprintf(
+			'<a href="%s" class="gfse-download" data-feed-id="%d" data-feed-name="%s">%s</a>',
+			esc_url( $download_url ),
+			absint( rgar( $feed, 'id' ) ),
+			esc_attr( rgars( $feed, 'meta/feedName' ) ),
+			esc_html__( 'Download', 'gf-scheduled-export' )
+		);
+
+		return $links;
+	}
+
+	/**
 	 * "Send Test" row action: run the feed immediately against its saved
 	 * settings without touching the real schedule.
 	 */
@@ -519,6 +627,151 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 		);
 	}
 
+	/**
+	 * The date picker the "Download" row action opens. One dialog serves
+	 * every row; js/download.js fills in which export was clicked.
+	 */
+	public function maybe_render_download_dialog() {
+		if ( rgget( 'page' ) !== 'gf_edit_forms' || rgget( 'view' ) !== 'settings' || rgget( 'subview' ) !== $this->_slug || ! $this->is_feed_list_page() ) {
+			return;
+		}
+
+		if ( ! GFCommon::current_user_can_any( 'gravityforms_export_entries' ) ) {
+			return;
+		}
+		?>
+		<dialog id="gfse-download-dialog" class="gfse-download-dialog" aria-labelledby="gfse-download-title">
+			<form method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="gfse_download">
+				<input type="hidden" name="feed_id" value="">
+				<?php wp_nonce_field( 'gfse_download', '_wpnonce', false ); ?>
+
+				<h2 id="gfse-download-title"><?php esc_html_e( 'Download entries', 'gf-scheduled-export' ); ?></h2>
+
+				<p>
+					<label for="gfse-download-start"><?php esc_html_e( 'From', 'gf-scheduled-export' ); ?></label>
+					<input type="date" id="gfse-download-start" name="start">
+					<span class="description"><?php esc_html_e( 'Leave blank to start from the first entry.', 'gf-scheduled-export' ); ?></span>
+				</p>
+
+				<p>
+					<label for="gfse-download-end"><?php esc_html_e( 'To', 'gf-scheduled-export' ); ?></label>
+					<input type="date" id="gfse-download-end" name="end">
+					<span class="description"><?php esc_html_e( 'Includes the whole day. Leave blank for entries up to now.', 'gf-scheduled-export' ); ?></span>
+				</p>
+
+				<p class="gfse-download-dialog__actions">
+					<button type="submit" class="button button-primary"><?php esc_html_e( 'Download spreadsheet', 'gf-scheduled-export' ); ?></button>
+					<button type="button" class="button" data-gfse-cancel><?php esc_html_e( 'Cancel', 'gf-scheduled-export' ); ?></button>
+				</p>
+			</form>
+		</dialog>
+		<?php
+	}
+
+	/**
+	 * "Download" row action: stream a spreadsheet of the entries between
+	 * the picked dates, filtered by the feed's conditional logic. Nothing
+	 * is emailed and the temp file is deleted once sent.
+	 */
+	public function handle_download() {
+		if ( ! GFCommon::current_user_can_any( 'gravityforms_export_entries' ) ) {
+			wp_die( esc_html__( 'You are not allowed to do that.', 'gf-scheduled-export' ) );
+		}
+
+		check_admin_referer( 'gfse_download' );
+
+		$feed_id = isset( $_GET['feed_id'] ) ? absint( $_GET['feed_id'] ) : 0;
+		$feed    = $this->get_feed( $feed_id );
+
+		if ( ! $feed || rgar( $feed, 'addon_slug' ) !== $this->_slug ) {
+			wp_die( esc_html__( 'That export could not be found.', 'gf-scheduled-export' ) );
+		}
+
+		$form = GFAPI::get_form( rgar( $feed, 'form_id' ) );
+
+		if ( ! $form ) {
+			wp_die( esc_html__( 'The form for this export no longer exists.', 'gf-scheduled-export' ) );
+		}
+
+		// A blank To runs up to now; a picked one includes that whole day.
+		$end = $this->parse_download_date( rgget( 'end' ) );
+		$end = $end ? $end->setTime( 23, 59, 59 ) : new DateTimeImmutable( 'now', wp_timezone() );
+
+		// A blank From starts at the oldest entry, so the file name shows a
+		// real date rather than 1970.
+		$start = $this->parse_download_date( rgget( 'start' ) );
+		if ( ! $start ) {
+			$start = $this->get_first_entry_time( $form );
+			$start = $start && $start < $end ? $start : $end;
+		}
+
+		if ( $start > $end ) {
+			wp_die( esc_html__( 'The From date is after the To date.', 'gf-scheduled-export' ), '', array( 'back_link' => true ) );
+		}
+
+		$entry_filter = function ( $entry ) use ( $feed, $form ) {
+			return $this->is_feed_condition_met( $feed, $form, $entry );
+		};
+
+		$export = GFSE_Exporter::export_form( $form, $start, $end, $entry_filter );
+
+		if ( is_wp_error( $export ) ) {
+			wp_die( esc_html( $export->get_error_message() ), '', array( 'back_link' => true ) );
+		}
+
+		$this->log_debug( __METHOD__ . '(): Feed #' . $feed_id . ' downloaded with ' . $export['count'] . ' entries.' );
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . basename( $export['file'] ) . '"' );
+		header( 'Content-Length: ' . filesize( $export['file'] ) );
+
+		readfile( $export['file'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
+		wp_delete_file( $export['file'] );
+		exit;
+	}
+
+	/**
+	 * @param string|null $raw "Y-m-d" from the download dialog's date input.
+	 * @return DateTimeImmutable|null Midnight at the start of that day in the
+	 *                                site timezone, or null if blank/invalid.
+	 */
+	private function parse_download_date( $raw ) {
+		$raw  = sanitize_text_field( (string) $raw );
+		$date = DateTimeImmutable::createFromFormat( '!Y-m-d', $raw, wp_timezone() );
+
+		// Round-trip check rejects overflow dates like 2026-02-31.
+		return $date && $date->format( 'Y-m-d' ) === $raw ? $date : null;
+	}
+
+	/**
+	 * @param array $form
+	 * @return DateTimeImmutable|null When the form's oldest entry was
+	 *                                submitted, or null if it has none.
+	 */
+	private function get_first_entry_time( $form ) {
+		$entries = GFAPI::get_entries(
+			$form['id'],
+			array( 'status' => 'active' ),
+			array(
+				'key'       => 'date_created',
+				'direction' => 'ASC',
+			),
+			array(
+				'offset'    => 0,
+				'page_size' => 1,
+			)
+		);
+
+		if ( is_wp_error( $entries ) || empty( $entries ) ) {
+			return null;
+		}
+
+		// Entry dates are stored in UTC.
+		return ( new DateTimeImmutable( $entries[0]['date_created'], new DateTimeZone( 'UTC' ) ) )->setTimezone( wp_timezone() );
+	}
+
 	public function feed_list_columns() {
 		return array(
 			'feedName'         => esc_html__( 'Name', 'gf-scheduled-export' ),
@@ -534,6 +787,7 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 			'hourly'  => esc_html__( 'Hourly', 'gf-scheduled-export' ),
 			'weekly'  => esc_html__( 'Weekly', 'gf-scheduled-export' ),
 			'monthly' => esc_html__( 'Monthly', 'gf-scheduled-export' ),
+			'manual'  => esc_html__( 'Manual download', 'gf-scheduled-export' ),
 		);
 
 		$frequency = rgars( $feed, 'meta/frequency' );
@@ -576,10 +830,19 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 	}
 
 	public function get_column_value_send_to( $feed ) {
+		// Manual exports keep the hidden default address, but never send to it.
+		if ( 'manual' === rgars( $feed, 'meta/frequency' ) ) {
+			return esc_html__( 'N/A', 'gf-scheduled-export' );
+		}
+
 		return esc_html( rgars( $feed, 'meta/send_to' ) );
 	}
 
 	public function get_column_value_last_run( $feed ) {
+		if ( 'manual' === rgars( $feed, 'meta/frequency' ) ) {
+			return esc_html__( 'N/A', 'gf-scheduled-export' );
+		}
+
 		$status = self::get_feed_status( rgar( $feed, 'id' ) );
 
 		if ( empty( $status['last_run'] ) || 'pending' === rgar( $status, 'result' ) ) {
@@ -616,7 +879,8 @@ class GF_Scheduled_Export extends GFFeedAddOn {
 	 */
 	public function process_scheduled_feeds() {
 		foreach ( $this->get_feeds() as $feed ) {
-			if ( empty( $feed['is_active'] ) ) {
+			// Manual exports are only ever downloaded.
+			if ( empty( $feed['is_active'] ) || 'manual' === rgars( $feed, 'meta/frequency' ) ) {
 				continue;
 			}
 
